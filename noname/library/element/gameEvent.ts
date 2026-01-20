@@ -1,19 +1,24 @@
 import { _status, game, get, lib, ui } from "noname";
 import { Player } from "./index.js";
-import ContentCompiler from "./GameEvent/compilers/ContentCompiler.ts";
-import GameEventManager from "./GameEvent/GameEventManager.ts";
+import ContentCompiler from "./GameEvent/compilers/ContentCompiler.js";
+import { EventCompileable, EventCompiledContent } from "./GameEvent/compilers/IContentCompiler.js";
+import GameEventManager from "./GameEvent/GameEventManager.js";
 export { GameEventManager, ContentCompiler };
 
-/**
- * @implements { PromiseLike<void> }
- */
-export class GameEvent {
-	/**
-	 * @param { string | GameEvent } [name]
-	 * @param { boolean } [trigger]
-	 * @param { GameEventManager } [manager]
-	 */
-	constructor(name = "", trigger = true, manager = _status.eventManager) {
+type triggerSkillTodo = {
+	skill: string;
+	player: Player;
+	priority: number;
+	indexedData?: Player | true;
+};
+type triggerPlayerTodo = {
+	player: Player | "firstDo" | "lastDo";
+	todoList: triggerSkillTodo[];
+	doneList: triggerSkillTodo[];
+};
+export class GameEvent implements PromiseLike<void> {
+	constructor(name: string = "", trigger: boolean = true, manager: GameEventManager = _status.eventManager) {
+		//@ts-ignore
 		if (name instanceof GameEvent) {
 			const other = name;
 			name = other.name;
@@ -36,180 +41,57 @@ export class GameEvent {
 	get [Symbol.toStringTag]() {
 		return "GameEvent";
 	}
-	/**
-	 * @type { Partial<Result> }
-	 */
-	result;
-	/**
-	 * @type { string }
-	 */
-	name;
-	/**
-	 * @type { string }
-	 */
-	type;
-	/**
-	 * @type { Player }
-	 */
-	source;
-	/**
-	 * @type { Player }
-	 */
-	player;
-	/**
-	 * @type { Player[] }
-	 */
-	players;
-	/**
-	 * @type { Player }
-	 */
-	target;
-	/**
-	 * @type { Player[] }
-	 */
-	targets;
-	/**
-	 * @type { Card }
-	 */
-	card;
-	/**
-	 * @type { Card[] }
-	 */
-	cards;
-	/**
-	 * @type { string }
-	 */
-	skill;
-	/**
-	 * @type { boolean }
-	 */
-	forced;
-	/**
-	 * @type { number }
-	 */
-	num;
-	/**
-	 * @type { number }
-	 */
-	original_num;
-	/**
-	 * @type { GameEvent }
-	 */
-	_trigger;
-	/**
-	 * @type { string }
-	 */
-	triggername;
-	/**
-	 * @type { boolean }
-	 */
-	notrigger;
-	/**
-	 * @type { Player[] }
-	 */
-	_notrigger = [];
-	/**
-	 * @type { Partial<Result> }
-	 */
-	_result = {};
-	/**
-	 * @type { any[] }
-	 */
-	_args = [];
-	/**
-	 * @type { [string, any][] }
-	 */
-	_set = [];
-	/**
-	 * @type { {
-	 *  add: {[type: string]: () => void}
-	 *  replace: {[type :string]: () => void}
-	 * } }
-	 */
-	custom = {
+	result: Partial<Result>;
+	name: string;
+	[key: string]: any;
+
+	type: string;
+	source: Player;
+	player: Player;
+	players: Player[];
+	target: Player;
+	targets: Player[];
+	card: VCard;
+	cards: Card[];
+	skill: string;
+
+	forced: boolean;
+	num: number;
+	original_num: number;
+	_trigger: GameEvent;
+	triggername: string;
+	notrigger: boolean;
+	_notrigger: Player[] = [];
+	_result: Partial<Result> = {};
+	_args: any[] = [];
+	_set: [string, any][] = [];
+	custom: {
+		add: Record<string, () => void>;
+		replace: Record<string, () => void>;
+	} = {
 		add: {},
 		replace: {},
 	};
-	/**
-	 * @type { boolean }
-	 */
-	directHit = false;
-	/**
-	 * @type { number }
-	 */
-	baseDamage;
-	/**
-	 * @type { number }
-	 */
-	extraDamage;
-	/**
-	 * @type { Player }
-	 */
-	customSource;
-	/**
-	 * @type { string }
-	 */
-	nature;
-	/**
-	 * @type { boolean }
-	 */
-	unreal;
-	/**
-	 * @type { Button[] }
-	 */
-	excludeButton;
-	/**
-	 * @type { ((this: this) => boolean) | undefined }
-	 */
-	filterStop;
-	/**
-	 * @type { Result['cost_data'] }
-	 */
-	cost_data;
-	/**
-	 * @type { boolean }
-	 */
-	responded;
-	/**
-	 * @type { string | undefined }
-	 */
-	judgestr;
-	/**
-	 * @type { boolean }
-	 */
-	judging;
-	/**
-	 * @type { Function | undefined }
-	 */
-	judge2;
-	/**
-	 * @type { Card[] }
-	 */
-	orderingCards;
-	/**
-	 * @type { Function | undefined }
-	 */
-	ai;
-	/**
-	 * @type { string[] }
-	 */
-	_aiexclude = [];
-	/**
-	 * @type { boolean }
-	 */
-	forceDie;
-	/**
-	 * @type { Function | undefined }
-	 */
-	_oncancel;
-	/**
-	 * @type { boolean }
-	 */
-	includeOut;
-	/**
-	 * @type { Function[] }
-	 */
-	targetprompt2 = [];
+	directHit: boolean = false;
+	baseDamage: number;
+	extraDamage: number;
+	customSource: Player;
+	nature: string;
+	unreal: boolean;
+	excludeButton: Button[];
+	filterStop?: (this: this) => boolean;
+	cost_data: Result["cost_data"];
+	responded: boolean;
+	judgestr?: string;
+	judging: boolean;
+	judge2?: (...args: any) => any;
+	orderingCards: Card[];
+	ai?: (...args: any) => any;
+	_aiexclude: string[] = [];
+	forceDie: boolean;
+	_oncancel?: (...args: any) => any;
+	includeOut: boolean;
+	targetprompt2: ((...args: any) => any)[] = [];
 	/**
 	 * @param {Parameters<typeof this.hasHandler>[0]} type
 	 * @param {GameEvent} event
@@ -316,8 +198,8 @@ export class GameEvent {
 		if (_status.closeStepCache) {
 			return func.apply(null, params);
 		}
-		var cacheKey = "[" + prefix + "]" + get.paramToCacheKey.apply(null, params);
-		var ret = this.getStepCache(cacheKey);
+		const cacheKey = "[" + prefix + "]" + get.paramToCacheKey.apply(null, params);
+		let ret = this.getStepCache(cacheKey);
 		if (ret === undefined || ret === null) {
 			ret = func.apply(null, params);
 			this.putStepCache(cacheKey, ret);
@@ -395,7 +277,7 @@ export class GameEvent {
 			this.directHit = true;
 		}
 	}
-	goto(step) {
+	goto(step: number) {
 		this.step = step;
 		return this;
 	}
@@ -403,18 +285,18 @@ export class GameEvent {
 		this.goto(this.step);
 		return this;
 	}
-	setHiddenSkill(skill) {
+	setHiddenSkill(skill: string) {
 		if (!this.player) {
 			return this;
 		}
-		var hidden = this.player.hiddenSkills.slice(0);
+		const hidden = this.player.hiddenSkills.slice(0);
 		game.expandSkills(hidden);
 		if (hidden.includes(skill)) {
 			this.set("hsskill", skill);
 		}
 		return this;
 	}
-	set(key, value) {
+	set(key: string, value: any) {
 		if (arguments.length == 1 && Array.isArray(arguments[0])) {
 			for (var i = 0; i < arguments[0].length; i++) {
 				if (Array.isArray(arguments[0][i])) {
@@ -432,10 +314,7 @@ export class GameEvent {
 		}
 		return this;
 	}
-	/**
-	 * @param {import("./GameEvent/compilers/IContentCompiler.js").EventCompileable} content
-	 */
-	setContent(content) {
+	setContent(content: EventCompileable) {
 		if (this.#inContent) {
 			throw new Error("Cannot set content when content is running");
 		}
@@ -444,8 +323,8 @@ export class GameEvent {
 	}
 
 	getLogv() {
-		for (var i = 1; i <= 3; i++) {
-			var event = this.getParent(i);
+		for (let i = 1; i <= 3; i++) {
+			const event = this.getParent(i);
 			if (event && event.logvid) {
 				return event.logvid;
 			}
@@ -456,8 +335,8 @@ export class GameEvent {
 		this.player.send(
 			function (name, args, set, event, skills) {
 				game.me.applySkills(skills);
-				var next = game.me[name].apply(game.me, args);
-				for (var i = 0; i < set.length; i++) {
+				const next = game.me[name].apply(game.me, args);
+				for (let i = 0; i < set.length; i++) {
 					next.set(set[i][0], set[i][1]);
 				}
 				if (next._backupevent) {
@@ -507,16 +386,19 @@ export class GameEvent {
 	 * 获取事件的父节点。
 	 * 获取事件链上的指定事件。
 	 * 默认获取上一个父节点（核心）。
-	 * @param {number|string|((evt:GameEvent)=>boolean)} [level=1] 获取深度（number）/指定名字（string）/指定特征（function）
-	 * @param {boolean} [forced] 若获取不到节点，默认返回{}，若forced为true则返回null
-	 * @param {boolean} [includeSelf] 若level不是数字，指定搜索时是否包含事件本身
-	 * @returns {GameEvent|{}|null}
+	 * @param level 获取深度（number）/指定名字（string）/指定特征（function）
+	 * @param forced 若获取不到节点，默认返回{}，若forced为true则返回undefined
+	 * @param includeSelf 若level不是数字，指定搜索时是否包含事件本身
 	 */
-	getParent(level = 1, forced, includeSelf) {
-		let event = this;
+	getParent(level?: number, forced?: boolean, includeSelf?: boolean): GameEvent | undefined;
+	getParent(level: string, forced?: boolean, includeSelf?: boolean): GameEvent | undefined;
+	getParent(level: (evt: GameEvent) => boolean, forced?: boolean, includeSelf?: boolean): GameEvent | undefined;
+
+	getParent(level: number | string | ((evt: GameEvent) => boolean) = 1, forced?: boolean, includeSelf?: boolean): GameEvent | undefined {
+		let event: GameEvent | undefined = this;
 		let i = 0;
-		const toreturn = forced ? null : {};
-		const historys = [];
+		const toreturn = forced ? undefined : ({} as GameEvent);
+		const historys: GameEvent[] = [];
 		const filter = typeof level === "function" ? level : typeof level === "number" ? evt => i === level : evt => evt.name === level;
 		while (true) {
 			if (!event) {
@@ -540,7 +422,7 @@ export class GameEvent {
 	getTrigger() {
 		return this.getParent(e => e._trigger, false, true)._trigger;
 	}
-	getRand(name) {
+	getRand(name?: string) {
 		if (name) {
 			if (!this._rand_map) {
 				this._rand_map = {};
@@ -596,7 +478,7 @@ export class GameEvent {
 			filterOk: this.filterOk,
 		};
 		if (skill) {
-			var info = get.info(skill);
+			const info = get.info(skill);
 			this.skill = skill;
 			this._aiexclude = [];
 			if (info.viewAs) {
@@ -624,9 +506,9 @@ export class GameEvent {
 					}
 					this.filterCard2 = get.filter(info.filterCard);
 					this.filterCard = function (card, player, event) {
-						var evt = event || _status.event;
+						const evt = event || _status.event;
 						if (!evt.ignoreMod && player) {
-							var mod = game.checkMod(card, player, "unchanged", "cardEnabled2", player);
+							const mod = game.checkMod(card, player, "unchanged", "cardEnabled2", player);
 							if (mod != "unchanged") {
 								return mod;
 							}
@@ -639,10 +521,10 @@ export class GameEvent {
 					};
 				}
 				this.filterOk = function () {
-					var evt = _status.event;
-					var card = get.card(),
+					const evt = _status.event;
+					const card = get.card(),
 						player = get.player();
-					var filter = evt._backup.filterCard;
+					const filter = evt._backup.filterCard;
 					if (typeof info.viewAs !== "function" && filter && !filter(card, player, evt)) {
 						return false;
 					}
@@ -751,17 +633,19 @@ export class GameEvent {
 		return this.getParent().name != "_lianhuan" && this.getParent().name != "_lianhuan2";
 	}
 	isPhaseUsing(player) {
-		var evt = this.getParent("phaseUse");
+		const evt = this.getParent("phaseUse");
 		if (!evt || evt.name != "phaseUse") {
 			return false;
 		}
 		return !player || player == evt.player;
 	}
+
+	doingList: triggerPlayerTodo[];
 	addTrigger(skills, player) {
 		if (!player || !skills) {
 			return this;
 		}
-		let evt = this;
+		let evt: GameEvent = this;
 		if (typeof skills == "string") {
 			skills = [skills];
 		}
@@ -791,7 +675,7 @@ export class GameEvent {
 				) {
 					return;
 				}
-				let toadds = [];
+				let toadds: triggerSkillTodo[] = [];
 				if (typeof info.getIndex === "function") {
 					const indexedResult = info.getIndex(evt.getTrigger(), player, evt.triggername);
 					if (Array.isArray(indexedResult)) {
@@ -874,12 +758,7 @@ export class GameEvent {
 			);
 		}
 	}
-	/**
-	 *
-	 * @param { string } name
-	 * @returns { GameEvent }
-	 */
-	trigger(name) {
+	trigger(name: string): GameEvent {
 		if (_status.video) {
 			return;
 		}
@@ -921,17 +800,17 @@ export class GameEvent {
 		if (!game.players.includes(start) && !game.dead.includes(start)) {
 			start = game.findNext(start);
 		}
-		const firstDo = {
+		const firstDo: triggerPlayerTodo = {
 			player: "firstDo",
 			todoList: [],
 			doneList: [],
 		};
-		const lastDo = {
+		const lastDo: triggerPlayerTodo = {
 			player: "lastDo",
 			todoList: [],
 			doneList: [],
 		};
-		const doingList = [];
+		const doingList: triggerPlayerTodo[] = [];
 		const roles = ["player", "source", "target", "global"],
 			map = lib.relatedTrigger,
 			names = Object.keys(map);
@@ -986,8 +865,8 @@ export class GameEvent {
 							priority: get.priority(skill),
 						});
 					}
-					if (typeof list.player == "string") {
-						list.sort((a, b) => b.priority - a.priority || playerMap.indexOf(a) - playerMap.indexOf(b));
+					if (typeof this.player == "string") {
+						list.sort((a, b) => b.priority - a.priority || playerMap.indexOf(a.player) - playerMap.indexOf(b.player));
 					} else {
 						list.sort((a, b) => b.priority - a.priority);
 					}
@@ -1026,7 +905,7 @@ export class GameEvent {
 								return map[evt].some(rawTrigger => {
 									return `${rawTrigger}${trigger.slice(evt.length)}` == name;
 								});
-							}
+							};
 							if (Array.isArray(expire[role])) {
 								return expire[role].length && expire[role].some(checkTrigger);
 							}
@@ -1065,7 +944,7 @@ export class GameEvent {
 		}
 		return null;
 	}
-	untrigger(all = true, player) {
+	untrigger(all = true, player?: Player) {
 		if (all) {
 			if (all !== "currentOnly") {
 				this._triggered = 5;
@@ -1079,51 +958,20 @@ export class GameEvent {
 		return this;
 	}
 
-	/**
-	 * @type { GameEventManager }
-	 */
-	manager;
-	/**
-	 * @type { import("./GameEvent/compilers/IContentCompiler.js").EventCompiledContent }
-	 */
-	content;
+	manager: GameEventManager;
+	content: EventCompiledContent;
 	/**
 	 * content执行中的标志，如果inContent && finished则不执行子事件
-	 * @type { boolean }
 	 */
 	#inContent = false;
-	/**
-	 * @type { GameEvent | void | null }
-	 */
-	parent;
-	/**
-	 * @type { GameEvent[] }
-	 */
-	childEvents = [];
-	/**
-	 * @type { boolean }
-	 */
+	parent?: GameEvent;
+	childEvents: GameEvent[] = [];
 	finished = false;
-	/**
-	 * @type { boolean }
-	 */
 	_neutralized = false;
-	/**
-	 * @type { number | null }
-	 */
-	_triggered = null;
-	/**
-	 * @type { GameEvent | undefined }
-	 */
-	_triggering;
-	/**
-	 * @type { number }
-	 */
-	#step = 0;
-	/**
-	 * @type { number | null }
-	 */
-	#nextStep = null;
+	_triggered: number | null = null;
+	_triggering?: GameEvent;
+	#step: number = 0;
+	#nextStep: number | null = null;
 	get step() {
 		return this.#step;
 	}
@@ -1138,19 +986,15 @@ export class GameEvent {
 		this.#nextStep = null;
 	}
 
-	/**
-	 * @type { GameEvent[] }
-	 */
-	next = (() => {
+	next: GameEvent[] = (() => {
 		const event = this;
-		return new Proxy([], {
+		return new Proxy<GameEvent[]>([], {
 			set(target, p, childEvent, receiver) {
-				// @ts-expect-error ignore
 				if (childEvent instanceof GameEvent && !target.includes(childEvent)) {
 					childEvent.parent = event;
 					const type = childEvent.getDefaultNextHandlerType();
-					// @ts-expect-error ignore
 					if (type) {
+						//@ts-ignore
 						childEvent.pushHandler(...event.getHandler(type));
 					}
 					if (event.#inContent && event.finished) {
@@ -1161,43 +1005,39 @@ export class GameEvent {
 			},
 		});
 	})();
-	/**
-	 * @type { GameEvent[] }
-	 */
-	after = [];
+	after: GameEvent[] = [];
 	/**
 	 * @template TResult1
 	 * @template TResult2
 	 * Attaches callbacks for the resolution and/or rejection of the Promise.
-	 * @param { (() => TResult1 | Promise<TResult1>) | null } [onfulfilled] The callback to execute when the Promise is resolved.
-	 * @param { ((reason: any) => TResult2 | Promise<TResult2>) | null } [onrejected] The callback to execute when the Promise is rejected.
-	 * @returns { Promise<TResult1 | TResult2> } A Promise for the completion of which ever callback is executed.
+	 * @param onfulfilled The callback to execute when the Promise is resolved.
+	 * @param onrejected The callback to execute when the Promise is rejected.
+	 * @returns A Promise for the completion of which ever callback is executed.
 	 */
-	then(onfulfilled, onrejected) {
+	then<TResult1, TResult2>(onfulfilled?: (() => TResult1 | Promise<TResult1>) | null, onrejected?: ((reason: any) => TResult2 | Promise<TResult2>) | null): Promise<TResult1 | TResult2> {
 		return (this.parent ? this.parent.waitNext() : this.start()).then(onfulfilled, onrejected);
 	}
 	/**
-	 * @template TResult
+	 * @template
 	 * Attaches a callback for only the rejection of the Promise.
-	 * @param onrejected The callback to execute when the Promise is rejected.* @param { ((reason: any) => TResult | Promise<TResult>) | null } [onrejected] The callback to execute when the Promise is rejected.
-	 * @returns { Promise<Omit<GameEvent,"then"> | TResult> } A Promise for the completion of which ever callback is executed.
+	 * @param onrejected The callback to execute when the Promise is rejected.
+	 * @returns A Promise for the completion of which ever callback is executed.
 	 */
-	catch(onrejected) {
+	catch<TResult>(onrejected?: ((reason: any) => TResult | Promise<TResult>) | null): Promise<TResult> {
 		return this.then(void 0, onrejected);
 	}
 	/**
 	 * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
 	 * resolved value cannot be modified from the callback.
-	 * @param { (() => void) | null } [onfinally] The callback to execute when the Promise is settled (fulfilled or rejected).
-	 * @returns { Promise<Omit<GameEvent,"then">> } A Promise for the completion of the callback.
+	 * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+	 * @returns A Promise for the completion of the callback.
 	 */
-	finally(onfinally) {
+	finally(onfinally?: (() => void) | null): Promise<void> {
 		return this.then(
-			result => {
+			() => {
 				if (onfinally) {
 					onfinally();
 				}
-				return result;
 			},
 			err => {
 				if (onfinally) {
@@ -1207,10 +1047,7 @@ export class GameEvent {
 			}
 		);
 	}
-	/**
-	 * @type { Promise<void> | null }
-	 */
-	#start = null;
+	#start?: Promise<void>;
 	resolve() {
 		if (!this.#start) {
 			this.#start = Promise.resolve();
@@ -1238,7 +1075,7 @@ export class GameEvent {
 		return this.#start;
 	}
 	async loop() {
-		const trigger = async (trigger, to) => {
+		const trigger = async (trigger: string, to: number) => {
 			this._triggered = to;
 			if (this.type == "card") {
 				await this.trigger("useCardTo" + trigger);
@@ -1275,10 +1112,8 @@ export class GameEvent {
 					await trigger("End", 3);
 				} else if (this._triggered === 3) {
 					await trigger("After", 4);
-				}
-				// @ts-expect-error ignore
-				else if (this.after.length) {
-					this.next.push(this.after.shift());
+				} else if (this.after.length) {
+					this.next.push(this.after.shift()!);
 				} else {
 					return;
 				}
@@ -1286,8 +1121,8 @@ export class GameEvent {
 		}
 	}
 
-	async checkSkipped() {
-		if (!this.player || !this.player.skipList.includes(this.name) && !this.isSkipped) {
+	async checkSkipped(): Promise<boolean> {
+		if (!this.player || (!this.player.skipList.includes(this.name) && !this.isSkipped)) {
 			return false;
 		}
 		this.player.skipList.remove(this.name);
@@ -1299,11 +1134,8 @@ export class GameEvent {
 		return true;
 	}
 
-	/**
-	 * @type { Promise<Partial<Result>|void> | null }
-	 */
-	#waitNext = null;
-	waitNext() {
+	#waitNext?: Promise<Partial<Result> | void>;
+	waitNext(): Promise<Partial<Result> | void> {
 		if (this.#waitNext) {
 			return this.#waitNext;
 		}
@@ -1329,7 +1161,7 @@ export class GameEvent {
 				}
 				this.next.shift();
 			}
-		})().finally(() => (this.#waitNext = null));
+		})().finally(() => (this.#waitNext = undefined));
 		return this.#waitNext;
 	}
 	/**
@@ -1339,10 +1171,8 @@ export class GameEvent {
 	const chooseCardResult = await player.chooseCard().forResult();
 	// 获取整个结果对象，然后访问如 chooseCardResult.cards 等属性
 	```
-	 * @this GameEvent
-	 * @returns {Promise<Partial<Result>>}
 	 */
-	async forResult() {
+	async forResult(): Promise<Partial<Result>> {
 		await this;
 		return this.result;
 	}
